@@ -7,11 +7,11 @@ import { Award, Home, KeyRound, LogOut, ScrollText, ShieldCheck, Users } from "l
 import { logoutAction } from "@/app/(auth)/actions";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: React.ElementType; soon?: string };
+type NavItem = { href: string; label: string; icon: React.ElementType; soon?: string; count?: number };
 
 const MAIN: NavItem[] = [
     { href: "/", label: "الرئيسية", icon: Home },
-    { href: "/security", label: "Zad Security", icon: ShieldCheck, soon: "قريباً" },
+    { href: "/security", label: "Zad Security", icon: ShieldCheck },
     { href: "/certificates", label: "الشهادات", icon: Award, soon: "قريباً" },
 ];
 
@@ -34,14 +34,20 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
             <Icon className="size-4 shrink-0" aria-hidden />
             <span className="flex-1">{item.label}</span>
             {item.soon && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{item.soon}</span>}
+            {!!item.count && (
+                <span className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[11px] font-semibold text-white" aria-label={`${item.count} جديد`}>
+                    {item.count}
+                </span>
+            )}
         </Link>
     );
 }
 
-export function Sidebar({ name, role }: { name: string; role: "ADMIN" | "STAFF" }) {
+export function Sidebar({ name, role, newRequests }: { name: string; role: "ADMIN" | "STAFF"; newRequests: number }) {
     const pathname = usePathname();
     const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
-    const items = role === "ADMIN" ? [...MAIN, ...ADMIN] : MAIN;
+    const main = MAIN.map((i) => (i.href === "/security" ? { ...i, count: newRequests } : i));
+    const items = role === "ADMIN" ? [...main, ...ADMIN] : main;
 
     return (
         <>
@@ -52,7 +58,7 @@ export function Sidebar({ name, role }: { name: string; role: "ADMIN" | "STAFF" 
                     <span className="text-xs text-white/60">لوحة التحكم</span>
                 </div>
                 <nav className="flex flex-1 flex-col gap-1" aria-label="القائمة الرئيسية">
-                    {MAIN.map((i) => (
+                    {main.map((i) => (
                         <NavLink key={i.href} item={i} active={isActive(i.href)} />
                     ))}
                     {role === "ADMIN" && (

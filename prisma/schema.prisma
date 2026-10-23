@@ -1,5 +1,6 @@
 // Zad Admin database schema (MySQL 8).
 // Phase 1: staff accounts, sessions, 2FA backup codes, audit log.
+// Phase 2: Zad Security requests from zad.gg/security, with notes.
 
 generator client {
     provider = "prisma-client-js"
@@ -36,9 +37,11 @@ model User {
     createdAt          DateTime  @default(now()) @map("created_at")
     updatedAt          DateTime  @updatedAt @map("updated_at")
 
-    sessions    Session[]
-    backupCodes BackupCode[]
-    auditLogs   AuditLog[]   @relation("actor")
+    sessions         Session[]
+    backupCodes      BackupCode[]
+    auditLogs        AuditLog[]    @relation("actor")
+    assignedRequests ScanRequest[] @relation("assignee")
+    requestNotes     RequestNote[]
 
     @@map("users")
 }
@@ -92,4 +95,67 @@ model AuditLog {
     @@index([actorId])
     @@index([action])
     @@map("audit_logs")
+}
+
+// ─── Phase 2: Zad Security ─────────────────────────────────────────────
+
+enum ScanType {
+    SITE
+    LEAK
+    /// Breach-alert sign-up (email only). Moves to confirmed subscribers in phase 5.
+    NOTIFY
+}
+
+enum RequestStatus {
+    NEW
+    CONTACTED
+    SCANNING
+    REPORT_SENT
+    CONVERTED
+    CLOSED
+}
+
+model ScanRequest {
+    /// Short number shown to staff, e.g. #1042
+    id              Int           @id @default(autoincrement())
+    /// Id sent by zad.gg, so a retried delivery is stored once
+    externalId      String?       @unique @map("external_id") @db.VarChar(64)
+    type            ScanType
+    status          RequestStatus @default(NEW)
+    name            String?       @db.VarChar(120)
+    email           String        @db.VarChar(191)
+    phone           String?       @db.VarChar(40)
+    target          String?       @db.VarChar(500)
+    authorized      Boolean       @default(false)
+    source          String?       @db.VarChar(64)
+    ip              String?       @db.VarChar(64)
+    userAgent       String?       @map("user_agent") @db.VarChar(255)
+    assigneeId      String?       @map("assignee_id")
+    statusChangedAt DateTime      @default(now()) @map("status_changed_at")
+    createdAt       DateTime      @default(now()) @map("created_at")
+    updatedAt       DateTime      @updatedAt @map("updated_at")
+
+    assignee User?         @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+    notes    RequestNote[]
+
+    @@index([status])
+    @@index([type])
+    @@index([createdAt])
+    @@index([email])
+    @@index([assigneeId])
+    @@map("scan_requests")
+}
+
+model RequestNote {
+    id        String   @id @default(cuid())
+    requestId Int      @map("request_id")
+    authorId  String?  @map("author_id")
+    body      String   @db.Text
+    createdAt DateTime @default(now()) @map("created_at")
+
+    request ScanRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+    author  User?       @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+    @@index([requestId])
+    @@map("request_notes")
 }

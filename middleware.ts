@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Cheap first gate: no session cookie → login page. The real check (database,
 // expiry, 2FA, role) runs on the server in every page and action.
-const PUBLIC_PATHS = ["/login", "/api/health"];
+// /api/ingest is checked by its own HMAC signature (and by IP in Nginx on the server).
+const PUBLIC_PATHS = ["/login", "/api/health", "/api/ingest"];
 const COOKIES = ["__Host-zad_admin", "zad_admin_session"];
 
 export function middleware(req: NextRequest) {

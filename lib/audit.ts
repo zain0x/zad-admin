@@ -17,6 +17,11 @@ export const AUDIT_LABELS: Record<string, string> = {
     "user.activated": "تفعيل حساب",
     "user.2fa_reset": "إعادة ضبط التحقق بخطوتين",
     "user.password_reset": "إعادة تعيين كلمة المرور",
+    "request.received": "طلب جديد من الموقع",
+    "request.status_changed": "تغيير حالة طلب",
+    "request.assigned": "تعيين مسؤول لطلب",
+    "request.note_added": "إضافة ملاحظة على طلب",
+    "request.exported": "تصدير الطلبات CSV",
 };
 
 type AuditInput = {
