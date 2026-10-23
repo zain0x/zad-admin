@@ -8,9 +8,10 @@ const csp = [
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
-    "font-src 'self'",
+    "font-src 'self' data:",
     `connect-src 'self'${isDev ? " ws:" : ""}`,
-    "frame-ancestors 'none'",
+    // The certificate preview is shown in an iframe on this same site.
+    "frame-ancestors 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
@@ -19,7 +20,7 @@ const csp = [
 const securityHeaders = [
     { key: "Content-Security-Policy", value: csp },
     { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
-    { key: "X-Frame-Options", value: "DENY" },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "no-referrer" },
     { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
@@ -29,6 +30,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
     turbopack: { root: process.cwd() },
+    // Playwright drives a real Chromium to print certificates to PDF; keep it out of the bundle.
+    serverExternalPackages: ["playwright", "playwright-core"],
     poweredByHeader: false,
     async headers() {
         return [{ source: "/:path*", headers: securityHeaders }];

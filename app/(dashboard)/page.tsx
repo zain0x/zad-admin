@@ -29,7 +29,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     const month = new Date(Date.now() - 30 * 24 * 3600_000);
     const scans = { type: { in: ["SITE", "LEAK"] as ("SITE" | "LEAK")[] } };
 
-    const [newCount, weekCount, openCount, mineOpen, monthScans, monthConverted, latest, failedToday, recent] = await Promise.all([
+    const [newCount, weekCount, openCount, mineOpen, monthScans, monthConverted, latest, failedToday, recent, certCount, certMonth] = await Promise.all([
         db.scanRequest.count({ where: { status: "NEW" } }),
         db.scanRequest.count({ where: { createdAt: { gte: week } } }),
         db.scanRequest.count({ where: { status: { in: OPEN_STATUSES } } }),
@@ -41,6 +41,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         isAdmin
             ? db.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 6, include: { actor: { select: { name: true } } } })
             : Promise.resolve([]),
+        db.certificate.count({ where: { status: "ACTIVE" } }),
+        db.certificate.count({ where: { status: "ACTIVE", createdAt: { gte: month } } }),
     ]);
 
     return (
@@ -98,17 +100,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
                 <div className="space-y-4">
                     {isAdmin && <Stat label="محاولات دخول فاشلة" value={failedToday} hint="آخر 24 ساعة" />}
-                    <Card className="flex gap-4 p-5">
-                        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                            <Award className="size-5" aria-hidden />
-                        </div>
-                        <div>
-                            <p className="font-semibold">
-                                الشهادات <span className="ms-1 text-xs font-normal text-muted-foreground">· المرحلة 3</span>
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">إصدار شهادات التدريب والمحاضرات والكورسات والتحقق منها.</p>
-                        </div>
-                    </Card>
+                    <Link href="/certificates" className="block rounded-xl focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none">
+                        <Card className="flex gap-4 p-5 hover:bg-muted/40">
+                            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                                <Award className="size-5" aria-hidden />
+                            </div>
+                            <div>
+                                <p className="font-semibold">الشهادات</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {certCount} شهادة صالحة، منها {certMonth} في آخر 30 يوماً.
+                                </p>
+                            </div>
+                        </Card>
+                    </Link>
                 </div>
             </div>
 

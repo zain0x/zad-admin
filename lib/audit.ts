@@ -22,6 +22,11 @@ export const AUDIT_LABELS: Record<string, string> = {
     "request.assigned": "تعيين مسؤول لطلب",
     "request.note_added": "إضافة ملاحظة على طلب",
     "request.exported": "تصدير الطلبات CSV",
+    "cert.issued": "إصدار شهادة",
+    "cert.bulk_issued": "إصدار شهادات جماعي",
+    "cert.updated": "تعديل شهادة",
+    "cert.revoked": "إلغاء شهادة",
+    "cert.restored": "إعادة تفعيل شهادة",
 };
 
 type AuditInput = {

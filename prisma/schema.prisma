@@ -1,6 +1,7 @@
 // Zad Admin database schema (MySQL 8).
 // Phase 1: staff accounts, sessions, 2FA backup codes, audit log.
 // Phase 2: Zad Security requests from zad.gg/security, with notes.
+// Phase 3: certificates (internship, attendance, course), verified at zad.gg/cert/<code>.
 
 generator client {
     provider = "prisma-client-js"
@@ -42,6 +43,8 @@ model User {
     auditLogs        AuditLog[]    @relation("actor")
     assignedRequests ScanRequest[] @relation("assignee")
     requestNotes     RequestNote[]
+    certsIssued      Certificate[] @relation("certIssuer")
+    certsRevoked     Certificate[] @relation("certRevoker")
 
     @@map("users")
 }
@@ -158,4 +161,56 @@ model RequestNote {
 
     @@index([requestId])
     @@map("request_notes")
+}
+
+// ─── Phase 3: Certificates ─────────────────────────────────────────────
+
+enum CertificateType {
+    INTERNSHIP
+    ATTENDANCE
+    COURSE
+}
+
+enum CertificateStatus {
+    ACTIVE
+    REVOKED
+}
+
+/// Only used to write the Arabic sentence correctly (أتمّ / أتمّت).
+enum Gender {
+    MALE
+    FEMALE
+}
+
+model Certificate {
+    id           String            @id @default(cuid())
+    /// Public number printed on the certificate and in the QR link, e.g. ZAD-2026-8K3F9Q
+    code         String            @unique @db.VarChar(32)
+    type         CertificateType
+    status       CertificateStatus @default(ACTIVE)
+    nameAr       String            @map("name_ar") @db.VarChar(160)
+    nameEn       String            @map("name_en") @db.VarChar(160)
+    gender       Gender            @default(MALE)
+    email        String?           @db.VarChar(191)
+    /// Type-specific fields (lib/certificates/types.ts → CertDetails)
+    details      Json
+    issuedAt     DateTime          @map("issued_at")
+    /// Certificates issued together from one CSV upload share a batch id
+    batchId      String?           @map("batch_id") @db.VarChar(32)
+    issuedById   String?           @map("issued_by_id")
+    revokedAt    DateTime?         @map("revoked_at")
+    revokedById  String?           @map("revoked_by_id")
+    revokeReason String?           @map("revoke_reason") @db.VarChar(500)
+    createdAt    DateTime          @default(now()) @map("created_at")
+    updatedAt    DateTime          @updatedAt @map("updated_at")
+
+    issuedBy  User? @relation("certIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+    revokedBy User? @relation("certRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
+
+    @@index([type])
+    @@index([status])
+    @@index([batchId])
+    @@index([createdAt])
+    @@index([email])
+    @@map("certificates")
 }

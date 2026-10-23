@@ -10,13 +10,15 @@
         "db:migrate": "prisma migrate dev",
         "db:deploy": "prisma migrate deploy",
         "db:studio": "prisma studio",
-        "create-admin": "tsx --env-file=.env scripts/create-admin.ts"
+        "create-admin": "tsx --env-file=.env scripts/create-admin.ts",
+        "pdf:install": "playwright install chromium"
     },
     "dependencies": {
         "@prisma/client": "^6.16.0",
         "clsx": "^2.1.1",
         "lucide-react": "^0.541.0",
         "next": "^15.5.7",
+        "playwright": "^1.55.0",
         "react": "19.1.0",
         "react-dom": "19.1.0",
         "tailwind-merge": "^3.3.1"

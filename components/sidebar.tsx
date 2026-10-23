@@ -12,7 +12,7 @@ type NavItem = { href: string; label: string; icon: React.ElementType; soon?: st
 const MAIN: NavItem[] = [
     { href: "/", label: "الرئيسية", icon: Home },
     { href: "/security", label: "Zad Security", icon: ShieldCheck },
-    { href: "/certificates", label: "الشهادات", icon: Award, soon: "قريباً" },
+    { href: "/certificates", label: "الشهادات", icon: Award },
 ];
 
 const ADMIN: NavItem[] = [
