@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Zad brand tokens (same values as zad-landing). */
+@theme inline {
+    --font-sans: var(--font-zad), system-ui, sans-serif;
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-line: var(--line);
+    --color-sidebar: var(--sidebar);
+}
+
+:root {
+    --background: oklch(0.985 0.003 300);
+    --foreground: oklch(0.2094 0.0896 304.83);
+    --primary: oklch(0.67 0.2021 300.48);
+    --primary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.965 0.006 300);
+    --muted-foreground: oklch(0.52 0.03 300);
+    --line: oklch(0.91 0.012 300);
+    --sidebar: oklch(0.2094 0.0896 304.83);
+}
+
+@layer base {
+    * {
+        @apply border-line;
+    }
+
+    body {
+        @apply bg-background text-foreground antialiased;
+    }
+
+    /* Latin text (emails, codes, IPs) inside RTL layout */
+    .ltr {
+        direction: ltr;
+        unicode-bidi: isolate;
+    }
+}
