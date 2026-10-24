@@ -30,6 +30,8 @@ model User {
     permCertificates   Boolean   @default(false) @map("perm_certificates")
     permSites          Boolean   @default(false) @map("perm_sites")
     permEmails         Boolean   @default(false) @map("perm_emails")
+    permLectures       Boolean   @default(false) @map("perm_lectures")
+    permInternships    Boolean   @default(false) @map("perm_internships")
     /// Encrypted with AUTH_SECRET (lib/auth/secret-box.ts)
     totpSecret         String?   @map("totp_secret") @db.VarChar(255)
     /// Secret shown during setup, before the first code confirms it
@@ -54,6 +56,9 @@ model User {
     requestsClosed   ScanRequest[]  @relation("requestCloser")
     findings         Finding[]      @relation("findingAuthor")
     requestFiles     RequestFile[]  @relation("fileUploader")
+    lecturesCreated  Lecture[]      @relation("lectureCreator")
+    internsSupervised InternshipApplication[] @relation("internSupervisor")
+    internshipNotes  InternshipNote[]
 
     @@map("users")
 }
@@ -366,4 +371,141 @@ model BreachCheckStat {
     @@index([emailHash])
     @@index([emailDomain])
     @@map("breach_check_stats")
+}
+
+// ─── Zad Academy ───────────────────────────────────────────────────────
+
+/// Small key/value settings changed from the dashboard (e.g. internship applications open/closed).
+model Setting {
+    key       String   @id @db.VarChar(64)
+    value     Json
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("settings")
+}
+
+enum LectureStatus {
+    DRAFT
+    PUBLISHED
+    CLOSED
+}
+
+enum LectureMode {
+    IN_PERSON
+    ONLINE
+}
+
+model Lecture {
+    id                   String        @id @default(cuid())
+    titleAr              String        @map("title_ar") @db.VarChar(200)
+    titleEn              String?       @map("title_en") @db.VarChar(200)
+    speaker              String?       @db.VarChar(160)
+    description          String?       @db.Text
+    startsAt             DateTime      @map("starts_at")
+    durationMinutes      Int           @map("duration_minutes")
+    mode                 LectureMode   @default(IN_PERSON)
+    /// Address for in-person lectures
+    location             String?       @db.VarChar(300)
+    /// Meeting link for online lectures, shown only to people who registered
+    onlineUrl            String?       @map("online_url") @db.VarChar(500)
+    capacity             Int
+    registrationDeadline DateTime?     @map("registration_deadline")
+    status               LectureStatus @default(DRAFT)
+    /// Cover image file name in UPLOADS_DIR
+    imageKey             String?       @map("image_key") @db.VarChar(100)
+    createdById          String?       @map("created_by_id")
+    createdAt            DateTime      @default(now()) @map("created_at")
+    updatedAt            DateTime      @updatedAt @map("updated_at")
+
+    createdBy     User?                 @relation("lectureCreator", fields: [createdById], references: [id], onDelete: SetNull)
+    registrations LectureRegistration[]
+
+    @@index([status, startsAt])
+    @@map("lectures")
+}
+
+enum RegistrationStatus {
+    CONFIRMED
+    CANCELLED
+}
+
+model LectureRegistration {
+    id          String             @id @default(cuid())
+    /// Shown to the person after registering, e.g. R-7K3F9Q
+    code        String             @unique @db.VarChar(16)
+    lectureId   String             @map("lecture_id")
+    nameAr      String             @map("name_ar") @db.VarChar(160)
+    nameEn      String             @map("name_en") @db.VarChar(160)
+    gender      Gender             @default(MALE)
+    email       String             @db.VarChar(191)
+    phone       String             @db.VarChar(40)
+    status      RegistrationStatus @default(CONFIRMED)
+    /// Phase 2: attendance, then attendance certificates
+    attended    Boolean            @default(false)
+    cancelledAt DateTime?          @map("cancelled_at")
+    createdAt   DateTime           @default(now()) @map("created_at")
+
+    lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+
+    @@unique([lectureId, email])
+    @@index([lectureId, status])
+    @@map("lecture_registrations")
+}
+
+enum InternshipStatus {
+    NEW
+    REVIEWING
+    ACCEPTED
+    ACTIVE
+    COMPLETED
+    REJECTED
+}
+
+model InternshipApplication {
+    /// Short number shown to staff and to the applicant, e.g. #57
+    id            Int              @id @default(autoincrement())
+    nameAr        String           @map("name_ar") @db.VarChar(160)
+    nameEn        String           @map("name_en") @db.VarChar(160)
+    gender        Gender           @default(MALE)
+    email         String           @db.VarChar(191)
+    phone         String           @db.VarChar(40)
+    university    String           @db.VarChar(200)
+    major         String?          @db.VarChar(200)
+    studyYear     String?          @map("study_year") @db.VarChar(60)
+    field         String           @db.VarChar(100)
+    bio           String?          @db.Text
+    cvKey         String?          @map("cv_key") @db.VarChar(100)
+    cvName        String?          @map("cv_name") @db.VarChar(255)
+    status        InternshipStatus @default(NEW)
+    supervisorId  String?          @map("supervisor_id")
+    /// Filled when accepted; reused for the internship certificate
+    department    String?          @db.VarChar(120)
+    startDate     DateTime?        @map("start_date")
+    endDate       DateTime?        @map("end_date")
+    hours         Int?
+    certificateId String?          @unique @map("certificate_id")
+    createdAt     DateTime         @default(now()) @map("created_at")
+    updatedAt     DateTime         @updatedAt @map("updated_at")
+
+    supervisor User?            @relation("internSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+    notes      InternshipNote[]
+
+    @@index([status])
+    @@index([createdAt])
+    @@index([email])
+    @@map("internship_applications")
+}
+
+model InternshipNote {
+    id            String   @id @default(cuid())
+    applicationId Int      @map("application_id")
+    authorId      String?  @map("author_id")
+    body          String   @db.Text
+    createdAt     DateTime @default(now()) @map("created_at")
+
+    application InternshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    author      User?                 @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+    @@index([applicationId])
+    @@map("internship_notes")
 }

@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { audit } from "@/lib/audit";
 import { runDueChecks } from "@/lib/breach/monitor";
+import { runLectureReminders } from "@/lib/academy-reminders";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,7 +20,11 @@ export async function POST(req: NextRequest) {
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    const reminders = await runLectureReminders().catch((err) => {
+        console.error("lecture reminders failed", err);
+        return 0;
+    });
     const result = await runDueChecks();
     if (result.checked) await audit({ actorId: null, action: "email.monitor_run", details: { ...result, via: "cron" } });
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, lectureReminders: reminders });
 }

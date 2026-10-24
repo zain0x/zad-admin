@@ -56,7 +56,16 @@ export default async function UsersPage() {
                                         {u.role === "ADMIN" ? (
                                             <span className="text-xs text-muted-foreground">كل الأقسام</span>
                                         ) : (
-                                            <PermsForm userId={u.id} perms={{ permCertificates: u.permCertificates, permSites: u.permSites, permEmails: u.permEmails }} />
+                                            <PermsForm
+                                                userId={u.id}
+                                                perms={{
+                                                    permCertificates: u.permCertificates,
+                                                    permSites: u.permSites,
+                                                    permEmails: u.permEmails,
+                                                    permLectures: u.permLectures,
+                                                    permInternships: u.permInternships,
+                                                }}
+                                            />
                                         )}
                                     </td>
                                     <td className="px-4 py-3">

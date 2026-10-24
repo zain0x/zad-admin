@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Globe, Home, KeyRound, ListChecks, LogOut, MailWarning, ScrollText, Users } from "lucide-react";
+import { Award, BookOpen, Globe, GraduationCap, Home, KeyRound, ListChecks, LogOut, MailWarning, ScrollText, Send, Users } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
 import type { Section } from "@/lib/auth/sections";
 import { cn } from "@/lib/utils";
@@ -16,11 +16,14 @@ const MAIN: NavItem[] = [
     { href: "/security/emails", label: "مراقبة الإيميلات", icon: MailWarning, section: "emails" },
     { href: "/security/emails/checks", label: "سجل فحوصات الإيميل", icon: ListChecks, section: "emails" },
     { href: "/certificates", label: "الشهادات", icon: Award, section: "certificates" },
+    { href: "/academy", label: "المحاضرات", icon: BookOpen, section: "lectures" },
+    { href: "/academy/internships", label: "طلبات التدريب", icon: GraduationCap, section: "internships" },
 ];
 
 const ADMIN: NavItem[] = [
     { href: "/settings/users", label: "الموظفون", icon: Users },
     { href: "/settings/audit", label: "سجل العمليات", icon: ScrollText },
+    { href: "/settings/telegram", label: "تنبيهات تيليقرام", icon: Send },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -52,12 +55,14 @@ export function Sidebar({
     sections,
     newRequests,
     newBreaches,
+    newInterns = 0,
 }: {
     name: string;
     role: "ADMIN" | "STAFF";
     sections: Record<Section, boolean>;
     newRequests: number;
     newBreaches: number;
+    newInterns?: number;
 }) {
     const pathname = usePathname();
     const isActive = (href: string) =>
@@ -67,9 +72,11 @@ export function Sidebar({
               ? pathname === "/security" || (pathname.startsWith("/security/") && !pathname.startsWith("/security/emails"))
               : href === "/security/emails"
                 ? pathname.startsWith(href) && !pathname.startsWith("/security/emails/checks")
-                : pathname.startsWith(href);
+                : href === "/academy"
+                  ? pathname.startsWith(href) && !pathname.startsWith("/academy/internships")
+                  : pathname.startsWith(href);
     const main = MAIN.filter((i) => !i.section || sections[i.section]).map((i) =>
-        i.href === "/security" ? { ...i, count: newRequests } : i.href === "/security/emails" ? { ...i, count: newBreaches } : i
+        i.href === "/security" ? { ...i, count: newRequests } : i.href === "/security/emails" ? { ...i, count: newBreaches } : i.href === "/academy/internships" ? { ...i, count: newInterns } : i
     );
     const items = role === "ADMIN" ? [...main, ...ADMIN] : main;
 

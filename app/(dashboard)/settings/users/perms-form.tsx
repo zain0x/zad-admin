@@ -5,7 +5,7 @@ import { manageUserAction } from "./actions";
 import { SECTIONS } from "@/lib/auth/sections";
 import { SubmitButton } from "@/components/submit-button";
 
-type Perms = { permCertificates: boolean; permSites: boolean; permEmails: boolean };
+type Perms = Record<(typeof SECTIONS)[number]["field"], boolean>;
 
 export function PermsForm({ userId, perms }: { userId: string; perms: Perms }) {
     const [state, action] = useActionState(manageUserAction, undefined);

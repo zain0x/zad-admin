@@ -46,6 +46,19 @@ export const AUDIT_LABELS: Record<string, string> = {
     "email.monitor_run": "تشغيل الفحص الدوري",
     "email.imported": "استيراد اشتراكات سابقة",
     "email.checks_exported": "تصدير سجل فحوصات الإيميل",
+    "lecture.created": "إضافة محاضرة",
+    "lecture.updated": "تعديل محاضرة",
+    "lecture.deleted": "حذف محاضرة",
+    "lecture.registration_cancelled": "إلغاء تسجيل في محاضرة",
+    "lecture.registrations_exported": "تصدير المسجلين",
+    "lecture.registered": "تسجيل في محاضرة",
+    "internship.applied": "طلب تدريب جديد",
+    "internship.status_changed": "تغيير حالة طلب تدريب",
+    "internship.updated": "تحديث بيانات التدريب",
+    "internship.note_added": "ملاحظة على طلب تدريب",
+    "internship.certificate_issued": "إصدار شهادة تدريب",
+    "internship.toggle": "فتح/إيقاف استقبال طلبات التدريب",
+    "telegram.updated": "تعديل تنبيهات تيليقرام",
 };
 
 type AuditInput = {

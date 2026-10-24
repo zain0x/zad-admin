@@ -1,10 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import type { ScanType } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { verifySignature } from "@/lib/ingest-signature";
 import { isCompanyDomain } from "@/lib/breach/domains";
 import { seal } from "@/lib/auth/secret-box";
+import { alertTelegram, esc, maskEmail } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,18 @@ export async function POST(req: NextRequest) {
                 breaches: names,
             },
         });
+        const shown = fullEmail ? maskEmail(fullEmail) : emailMasked;
+        after(() =>
+            alertTelegram(
+                "breach_check",
+                [
+                    `الإيميل: <code>${esc(shown ?? "—")}</code>${emailDomain && isCompanyDomain(emailDomain) ? " · 🏢 إيميل شركة" : ""}`,
+                    breachCount === 0 ? "النتيجة: ✅ ما في تسريبات" : `النتيجة: ⚠️ <b>${breachCount}</b> تسريب`,
+                    names.length ? `من: ${esc(names.slice(0, 5).join("، "))}${names.length > 5 ? ` و${names.length - 5} غيرهم` : ""}` : null,
+                ],
+                "/security/emails/checks"
+            )
+        );
         return NextResponse.json({ ok: true }, { status: 201 });
     }
 
@@ -94,6 +107,7 @@ export async function POST(req: NextRequest) {
         }
         const m = await db.monitoredEmail.create({ data: { email, source: str(body.source, 64) ?? "zad.gg/security" } });
         await audit({ actorId: null, action: "email.added", targetType: "monitored_email", targetId: m.id, details: { via: "site" } });
+        after(() => alertTelegram("notify", [`الإيميل: <code>${esc(maskEmail(email))}</code>`, "انضاف لمراقبة الإيميلات، وأول فحص بيصير بالدورة الجاية."], `/security/emails/${m.id}`));
         return NextResponse.json({ id: m.id }, { status: 201 });
     }
 
@@ -132,5 +146,18 @@ export async function POST(req: NextRequest) {
         },
     });
     await audit({ actorId: null, action: "request.received", targetType: "scan_request", targetId: String(created.id), details: { type } });
+    after(() =>
+        alertTelegram(
+            type === "LEAK" ? "scan_leak" : "scan_site",
+            [
+                `رقم الطلب: <b>#${created.id}</b>`,
+                `الاسم: ${esc(name)}`,
+                `الموقع: ${esc(target)}`,
+                `الهاتف: <code>${esc(phone || "—")}</code>`,
+                `الإيميل: <code>${esc(maskEmail(email))}</code>`,
+            ],
+            `/security/${created.id}`
+        )
+    );
     return NextResponse.json({ id: created.id }, { status: 201 });
 }

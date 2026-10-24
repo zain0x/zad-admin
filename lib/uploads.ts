@@ -46,6 +46,14 @@ export async function saveUpload(file: File, ext: string): Promise<string> {
     return key;
 }
 
+/** Same as saveUpload, for bytes that did not come from a form (e.g. a CV forwarded by zad.gg). */
+export async function saveUploadBytes(data: Buffer, ext: string): Promise<string> {
+    await mkdir(dir(), { recursive: true });
+    const key = `${randomBytes(16).toString("hex")}.${ext}`;
+    await writeFile(path.join(dir(), key), data, { mode: 0o600 });
+    return key;
+}
+
 function safePath(key: string) {
     if (!/^[0-9a-f]{32}\.[a-z0-9]{1,5}$/.test(key)) throw new Error("bad storage key");
     return path.join(dir(), key);
