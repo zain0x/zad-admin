@@ -6,6 +6,11 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth/session";
 import { generateTempPassword, hashPassword } from "@/lib/auth/password";
+import { SECTIONS } from "@/lib/auth/permissions";
+
+function readPerms(form: FormData) {
+    return Object.fromEntries(SECTIONS.map((s) => [s.field, form.get(s.field) === "on"])) as Record<(typeof SECTIONS)[number]["field"], boolean>;
+}
 
 export type ManageState = { ok?: string; error?: string; tempPassword?: string; email?: string } | undefined;
 
@@ -29,10 +34,17 @@ export async function createUserAction(_prev: ManageState, form: FormData): Prom
     if (await db.user.findUnique({ where: { email } })) return { error: "يوجد حساب بهذا البريد." };
 
     const tempPassword = generateTempPassword();
+    const perms = readPerms(form);
     const created = await db.user.create({
-        data: { name, email, role, passwordHash: await hashPassword(tempPassword), mustChangePassword: true },
+        data: { name, email, role, passwordHash: await hashPassword(tempPassword), mustChangePassword: true, ...perms },
     });
-    await audit({ actorId: actor.id, action: "user.created", targetType: "user", targetId: created.id, details: { email, role } });
+    await audit({
+        actorId: actor.id,
+        action: "user.created",
+        targetType: "user",
+        targetId: created.id,
+        details: { email, role, sections: SECTIONS.filter((x) => perms[x.field]).map((x) => x.key).join(",") || "none" },
+    });
     revalidatePath("/settings/users");
     return { ok: `تمت إضافة ${name}.`, tempPassword, email };
 }
@@ -49,6 +61,13 @@ export async function manageUserAction(_prev: ManageState, form: FormData): Prom
         audit({ actorId: actor.id, action, targetType: "user", targetId: target.id, details: { email: target.email, ...details } });
 
     switch (intent) {
+        case "perms": {
+            const perms = readPerms(form);
+            await db.user.update({ where: { id: target.id }, data: perms });
+            await log("user.permissions_changed", { sections: SECTIONS.filter((x) => perms[x.field]).map((x) => x.key).join(",") || "none" });
+            revalidatePath("/settings/users");
+            return { ok: "تم حفظ الصلاحيات." };
+        }
         case "role": {
             const role: Role = target.role === "ADMIN" ? "STAFF" : "ADMIN";
             if (target.role === "ADMIN" && !(await anotherActiveAdmin(target.id))) {

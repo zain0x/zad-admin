@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireSection } from "@/lib/auth/permissions";
 import { isoDate } from "@/lib/certificates/format";
 import type { CertDetails } from "@/lib/certificates/types";
 import { PageHeader } from "@/components/page-header";
@@ -13,7 +13,7 @@ import { CertForm } from "../../cert-form";
 export const metadata: Metadata = { title: "تعديل شهادة" };
 
 export default async function EditCertificatePage({ params }: { params: Promise<{ id: string }> }) {
-    await requireUser();
+    await requireSection("certificates");
     const { id } = await params;
     const c = await db.certificate.findUnique({ where: { id } });
     if (!c) notFound();

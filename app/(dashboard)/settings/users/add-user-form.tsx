@@ -6,6 +6,7 @@ import { TempPassword } from "./temp-password";
 import { Alert } from "@/components/ui/alert";
 import { Input, Label, Select } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { SECTIONS } from "@/lib/auth/sections";
 
 export function AddUserForm() {
     const [state, action] = useActionState(createUserAction, undefined);
@@ -33,6 +34,18 @@ export function AddUserForm() {
                     </Select>
                 </div>
                 <SubmitButton pendingText="جارٍ الإضافة…">إضافة</SubmitButton>
+                <fieldset className="sm:col-span-4">
+                    <legend className="mb-1.5 text-sm font-medium">الأقسام المسموحة (للموظف، المدير عنده الكل)</legend>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2">
+                        {SECTIONS.map((s) => (
+                            <label key={s.key} className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" name={s.field} />
+                                {s.label}
+                                <span className="text-xs text-muted-foreground">({s.hint})</span>
+                            </label>
+                        ))}
+                    </div>
+                </fieldset>
             </form>
             {state?.error && (
                 <div className="mt-3">

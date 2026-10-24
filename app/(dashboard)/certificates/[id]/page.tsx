@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Download, ExternalLink, Pencil } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireSection } from "@/lib/auth/permissions";
 import { AUDIT_LABELS } from "@/lib/audit";
 import { arDate } from "@/lib/certificates/format";
 import { verifyUrl } from "@/lib/certificates/template";
@@ -40,7 +40,7 @@ function linkedInUrl(c: { code: string; type: keyof typeof TYPE_TITLES; issuedAt
 }
 
 export default async function CertificatePage({ params, searchParams }: Props) {
-    await requireUser();
+    await requireSection("certificates");
     const { id } = await params;
     const sp = await searchParams;
     const [c, history] = await Promise.all([

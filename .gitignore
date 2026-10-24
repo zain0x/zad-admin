@@ -16,3 +16,6 @@ next-env.d.ts
 .DS_Store
 *.pem
 npm-debug.log*
+
+# uploaded files (scan request attachments)
+/storage

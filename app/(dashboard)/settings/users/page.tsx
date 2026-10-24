@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { AddUserForm } from "./add-user-form";
 import { UserActions } from "./user-actions";
+import { PermsForm } from "./perms-form";
 
 export const metadata: Metadata = { title: "الموظفون" };
 
@@ -17,7 +18,7 @@ export default async function UsersPage() {
 
     return (
         <>
-            <PageHeader title="الموظفون" description="لا يوجد تسجيل مفتوح: كل حساب يضيفه مدير." />
+            <PageHeader title="الموظفون" description="لا يوجد تسجيل مفتوح: كل حساب يضيفه مدير، ويحدد الأقسام اللي يشتغل عليها." />
 
             <Card className="mb-6">
                 <CardHeader title="إضافة موظف" description="يحصل على كلمة مرور مؤقتة، ويُلزم بتغييرها وبإعداد التحقق بخطوتين عند أول دخول." />
@@ -25,11 +26,12 @@ export default async function UsersPage() {
             </Card>
 
             <Card className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-sm">
+                <table className="w-full min-w-[1040px] text-sm">
                     <thead className="bg-muted text-muted-foreground">
                         <tr className="text-start">
                             <th className="px-4 py-3 text-start font-medium">الموظف</th>
                             <th className="px-4 py-3 text-start font-medium">الدور</th>
+                            <th className="px-4 py-3 text-start font-medium">الصلاحيات</th>
                             <th className="px-4 py-3 text-start font-medium">الحالة</th>
                             <th className="px-4 py-3 text-start font-medium">التحقق بخطوتين</th>
                             <th className="px-4 py-3 text-start font-medium">آخر دخول</th>
@@ -49,6 +51,13 @@ export default async function UsersPage() {
                                     </td>
                                     <td className="px-4 py-3">
                                         <Badge tone={u.role === "ADMIN" ? "primary" : "neutral"}>{u.role === "ADMIN" ? "مدير" : "موظف"}</Badge>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {u.role === "ADMIN" ? (
+                                            <span className="text-xs text-muted-foreground">كل الأقسام</span>
+                                        ) : (
+                                            <PermsForm userId={u.id} perms={{ permCertificates: u.permCertificates, permSites: u.permSites, permEmails: u.permEmails }} />
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         {!u.isActive ? (

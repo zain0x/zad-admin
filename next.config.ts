@@ -32,6 +32,8 @@ const nextConfig: NextConfig = {
     turbopack: { root: process.cwd() },
     // Playwright drives a real Chromium to print certificates to PDF; keep it out of the bundle.
     serverExternalPackages: ["playwright", "playwright-core"],
+    // Staff attach reports and screenshots to scan requests (lib/uploads.ts caps each file at 20 MB).
+    experimental: { serverActions: { bodySizeLimit: "25mb" } },
     poweredByHeader: false,
     async headers() {
         return [{ source: "/:path*", headers: securityHeaders }];

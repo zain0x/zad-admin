@@ -1,25 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download } from "lucide-react";
+import { Download, Lock, Plus } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
-import { STATUS_LABELS, STATUS_ORDER, STATUS_TONES, TYPE_LABELS, buildRequestWhere, type RequestFilters } from "@/lib/requests";
+import { requireSection } from "@/lib/auth/permissions";
+import { SCAN_TYPES, STATUS_LABELS, STATUS_ORDER, STATUS_TONES, TYPE_LABELS, buildRequestWhere, type RequestFilters } from "@/lib/requests";
 import { cn, formatDateTime } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonClass } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export const metadata: Metadata = { title: "Zad Security" };
+export const metadata: Metadata = { title: "فحص المواقع" };
 
 const PAGE_SIZE = 25;
 
 export default async function SecurityRequestsPage({ searchParams }: { searchParams: Promise<RequestFilters & { page?: string }> }) {
-    const { user } = await requireUser();
+    const { user } = await requireSection("sites");
+    const isAdmin = user.role === "ADMIN";
     const sp = await searchParams;
     const filters: RequestFilters = { status: sp.status, type: sp.type, q: sp.q, mine: sp.mine };
     const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
-    const where = buildRequestWhere(filters, user.id);
+    const where = buildRequestWhere(filters, user);
+    const now = new Date();
 
     const [rows, total, byStatus] = await Promise.all([
         db.scanRequest.findMany({
@@ -27,10 +29,14 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
             orderBy: { createdAt: "desc" },
             skip: (page - 1) * PAGE_SIZE,
             take: PAGE_SIZE,
-            include: { assignee: { select: { name: true } } },
+            include: { assignee: { select: { name: true } }, _count: { select: { findings: true } } },
         }),
         db.scanRequest.count({ where }),
-        db.scanRequest.groupBy({ by: ["status"], _count: { _all: true } }),
+        db.scanRequest.groupBy({
+            by: ["status"],
+            where: { type: { in: SCAN_TYPES }, ...(isAdmin ? {} : { assigneeId: user.id }) },
+            _count: { _all: true },
+        }),
     ]);
     const countOf = (s: string) => byStatus.find((b) => b.status === s)?._count._all ?? 0;
     const all = byStatus.reduce((n, b) => n + b._count._all, 0);
@@ -54,13 +60,21 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
     return (
         <>
             <PageHeader
-                title="Zad Security"
-                description="طلبات الفحص والاشتراكات القادمة من zad.gg/security."
+                title="فحص المواقع"
+                description={isAdmin ? "طلبات فحص المواقع والتسريبات من zad.gg/security، والطلبات اللي تنشئها هنا." : "طلبات الفحص المسندة لك."}
                 action={
-                    <a href={`/security/export${exportQs ? `?${exportQs}` : ""}`} className={buttonClass("secondary", "md")}>
-                        <Download className="size-4" aria-hidden />
-                        تصدير CSV
-                    </a>
+                    <div className="flex flex-wrap gap-2">
+                        <a href={`/security/export${exportQs ? `?${exportQs}` : ""}`} className={buttonClass("secondary", "md")}>
+                            <Download className="size-4" aria-hidden />
+                            تصدير CSV
+                        </a>
+                        {isAdmin && (
+                            <Link href="/security/new" className={buttonClass("primary", "md")}>
+                                <Plus className="size-4" aria-hidden />
+                                طلب فحص جديد
+                            </Link>
+                        )}
+                    </div>
                 }
             />
 
@@ -95,16 +109,18 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
                 />
                 <select name="type" defaultValue={filters.type ?? ""} aria-label="نوع الطلب" className="h-9 rounded-lg border border-line bg-white px-3 text-sm">
                     <option value="">كل الأنواع</option>
-                    {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                    {SCAN_TYPES.map((k) => [k, TYPE_LABELS[k]] as const).map(([k, v]) => (
                         <option key={k} value={k}>
                             {v}
                         </option>
                     ))}
                 </select>
-                <label className="flex items-center gap-1.5 text-sm">
-                    <input type="checkbox" name="mine" value="1" defaultChecked={filters.mine === "1"} />
-                    طلباتي فقط
-                </label>
+                {isAdmin && (
+                    <label className="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" name="mine" value="1" defaultChecked={filters.mine === "1"} />
+                        طلباتي فقط
+                    </label>
+                )}
                 <button type="submit" className={buttonClass("secondary", "sm")}>
                     تطبيق
                 </button>
@@ -116,7 +132,7 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
             </form>
 
             <Card className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-sm">
+                <table className="w-full min-w-[1000px] text-sm">
                     <thead className="bg-muted text-muted-foreground">
                         <tr>
                             <th className="px-4 py-3 text-start font-medium">#</th>
@@ -125,6 +141,8 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
                             <th className="px-4 py-3 text-start font-medium">الموقع</th>
                             <th className="px-4 py-3 text-start font-medium">الحالة</th>
                             <th className="px-4 py-3 text-start font-medium">المسؤول</th>
+                            <th className="px-4 py-3 text-start font-medium">الثغرات</th>
+                            <th className="px-4 py-3 text-start font-medium">التسليم</th>
                             <th className="px-4 py-3 text-start font-medium">التاريخ</th>
                         </tr>
                     </thead>
@@ -143,16 +161,27 @@ export default async function SecurityRequestsPage({ searchParams }: { searchPar
                                 </td>
                                 <td className="ltr max-w-[220px] truncate px-4 py-3 text-start">{r.target?.replace(/^https?:\/\//, "") ?? "—"}</td>
                                 <td className="px-4 py-3">
-                                    <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
+                                    <span className="inline-flex items-center gap-1">
+                                        <Badge tone={STATUS_TONES[r.status]}>{STATUS_LABELS[r.status]}</Badge>
+                                        {r.closedAt && <Lock className="size-3.5 text-muted-foreground" aria-label="الملف مقفل" />}
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3 text-muted-foreground">{r.assignee?.name ?? "—"}</td>
+                                <td className="px-4 py-3 text-muted-foreground">{r._count.findings || "—"}</td>
+                                <td className={cn("px-4 py-3 whitespace-nowrap text-xs", !r.closedAt && r.dueAt && r.dueAt < now ? "font-medium text-red-600" : "text-muted-foreground")}>
+                                    {r.dueAt ? formatDateTime(r.dueAt).split("،")[0] : "—"}
+                                </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatDateTime(r.createdAt)}</td>
                             </tr>
                         ))}
                         {rows.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                                    {all === 0 ? "لم يصل أي طلب بعد. الطلبات من zad.gg/security تظهر هنا تلقائياً." : "لا توجد طلبات بهذه التصفية."}
+                                <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                                    {all === 0
+                                        ? isAdmin
+                                            ? "لم يصل أي طلب بعد. الطلبات من zad.gg/security تظهر هنا تلقائياً."
+                                            : "لا توجد طلبات مسندة لك حالياً."
+                                        : "لا توجد طلبات بهذه التصفية."}
                                 </td>
                             </tr>
                         )}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { requireUser } from "@/lib/auth/session";
+import { requireSection } from "@/lib/auth/permissions";
 import { todayIso } from "@/lib/certificates/format";
 import { PageHeader } from "@/components/page-header";
 import { BulkForm } from "./bulk-form";
@@ -9,7 +9,7 @@ import { BulkForm } from "./bulk-form";
 export const metadata: Metadata = { title: "إصدار جماعي" };
 
 export default async function BulkPage() {
-    await requireUser();
+    await requireSection("certificates");
     return (
         <>
             <Link href="/certificates" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">

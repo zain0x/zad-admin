@@ -3,16 +3,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Award, Home, KeyRound, LogOut, ScrollText, ShieldCheck, Users } from "lucide-react";
+import { Award, Globe, Home, KeyRound, ListChecks, LogOut, MailWarning, ScrollText, Users } from "lucide-react";
 import { logoutAction } from "@/app/(auth)/actions";
+import type { Section } from "@/lib/auth/sections";
 import { cn } from "@/lib/utils";
 
-type NavItem = { href: string; label: string; icon: React.ElementType; soon?: string; count?: number };
+type NavItem = { href: string; label: string; icon: React.ElementType; soon?: string; count?: number; section?: Section };
 
 const MAIN: NavItem[] = [
     { href: "/", label: "الرئيسية", icon: Home },
-    { href: "/security", label: "Zad Security", icon: ShieldCheck },
-    { href: "/certificates", label: "الشهادات", icon: Award },
+    { href: "/security", label: "فحص المواقع", icon: Globe, section: "sites" },
+    { href: "/security/emails", label: "مراقبة الإيميلات", icon: MailWarning, section: "emails" },
+    { href: "/security/emails/checks", label: "سجل فحوصات الإيميل", icon: ListChecks, section: "emails" },
+    { href: "/certificates", label: "الشهادات", icon: Award, section: "certificates" },
 ];
 
 const ADMIN: NavItem[] = [
@@ -43,10 +46,31 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
     );
 }
 
-export function Sidebar({ name, role, newRequests }: { name: string; role: "ADMIN" | "STAFF"; newRequests: number }) {
+export function Sidebar({
+    name,
+    role,
+    sections,
+    newRequests,
+    newBreaches,
+}: {
+    name: string;
+    role: "ADMIN" | "STAFF";
+    sections: Record<Section, boolean>;
+    newRequests: number;
+    newBreaches: number;
+}) {
     const pathname = usePathname();
-    const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
-    const main = MAIN.map((i) => (i.href === "/security" ? { ...i, count: newRequests } : i));
+    const isActive = (href: string) =>
+        href === "/"
+            ? pathname === "/"
+            : href === "/security"
+              ? pathname === "/security" || (pathname.startsWith("/security/") && !pathname.startsWith("/security/emails"))
+              : href === "/security/emails"
+                ? pathname.startsWith(href) && !pathname.startsWith("/security/emails/checks")
+                : pathname.startsWith(href);
+    const main = MAIN.filter((i) => !i.section || sections[i.section]).map((i) =>
+        i.href === "/security" ? { ...i, count: newRequests } : i.href === "/security/emails" ? { ...i, count: newBreaches } : i
+    );
     const items = role === "ADMIN" ? [...main, ...ADMIN] : main;
 
     return (

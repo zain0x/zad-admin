@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { Download, Plus, Upload } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth/session";
+import { requireSection } from "@/lib/auth/permissions";
 import { arDate } from "@/lib/certificates/format";
 import { TYPE_LABELS, isCertType, type CertDetails } from "@/lib/certificates/types";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ const PAGE_SIZE = 25;
 type Filters = { q?: string; type?: string; status?: string; batch?: string; page?: string };
 
 export default async function CertificatesPage({ searchParams }: { searchParams: Promise<Filters> }) {
-    await requireUser();
+    await requireSection("certificates");
     const sp = await searchParams;
     const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
     const where: Prisma.CertificateWhereInput = {};

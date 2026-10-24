@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { routeUser } from "@/lib/auth/route-auth";
+import { can } from "@/lib/auth/permissions";
 import { certificatesPdf } from "@/lib/certificates/pdf";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ function fileName(nameEn: string, code: string) {
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-    if (!(await routeUser())) return new NextResponse("Unauthorized", { status: 401 });
+    const auth = await routeUser();
+    if (!auth || !can(auth.user, "certificates")) return new NextResponse("Unauthorized", { status: 401 });
     const { id } = await params;
     const cert = await db.certificate.findUnique({ where: { id } });
     if (!cert) return new NextResponse("Not found", { status: 404 });

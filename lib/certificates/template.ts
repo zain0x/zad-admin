@@ -17,7 +17,7 @@ function cleanSvg(svg: string) {
     return svg.replace(/<metadata>[\s\S]*?<\/metadata>/g, "").replace(/\s+xmlns:c2pa="[^"]*"/g, "");
 }
 
-let assets: { css: string; logo: string; signature: string; mark: string } | null = null;
+let assets: { css: string; fonts: string; logo: string; signature: string; mark: string } | null = null;
 function loadAssets() {
     if (assets) return assets;
     const font = (file: string, weight: number) =>
@@ -30,12 +30,19 @@ function loadAssets() {
     ].join("");
     const icon = cleanSvg(read("public", "brand", "zad-icon-primary.svg").toString()).replace(/#[0-9a-fA-F]{6}/g, "#ffffff");
     assets = {
+        fonts,
         css: fonts + read("lib", "certificates", "assets", "certificate.css").toString(),
         logo: cleanSvg(read("public", "brand", "zad-logo-primary.svg").toString()),
         signature: read("lib", "certificates", "assets", "signature.svg").toString(),
         mark: `data:image/svg+xml;base64,${Buffer.from(icon).toString("base64")}`,
     };
     return assets;
+}
+
+/** Embedded Zad fonts and logo, for other printed documents (scan reports). */
+export function brandAssets() {
+    const a = loadAssets();
+    return { fonts: a.fonts, logo: a.logo };
 }
 
 const esc = (s: unknown) =>
@@ -52,6 +59,9 @@ function qrSvg(url: string) {
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (m[r][c]) d += `M${c} ${r}h1v1h-1z`;
     return `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/><path d="${d}" fill="#27093c"/></svg>`;
 }
+
+/** Bump whenever the certificate design changes, so cached images and PDFs are drawn again. */
+export const TEMPLATE_VERSION = "2026-10-24";
 
 export function verifyUrl(code: string) {
     const base = (process.env.CERT_VERIFY_BASE_URL || "https://zad.gg/cert").replace(/\/+$/, "");
@@ -85,11 +95,9 @@ function section(c: Renderable, a: ReturnType<typeof loadAssets>) {
     <header><div class="logo">${a.logo}</div></header>
     <div class="content">
       <h1>${esc(t.ar)}</h1>
-      <p class="en title-en">${esc(t.en)}</p>
       <p class="en name" style="font-size:${nameSize(c.nameEn)}px">${esc(c.nameEn)}</p>
       <p class="name-ar">${esc(c.nameAr)}</p>
       <p class="body">${esc(info.bodyAr)}</p>
-      <p class="en body-en">${esc(info.bodyEn)}</p>
       <div class="facts" style="grid-template-columns:repeat(${factCount},1fr)">${facts}</div>
       ${skills}
     </div>
@@ -113,7 +121,7 @@ function section(c: Renderable, a: ReturnType<typeof loadAssets>) {
 </section>`;
 }
 
-export function renderCertificatesHtml(certs: Renderable[], opts: { preview?: boolean } = {}) {
+export function renderCertificatesHtml(certs: Renderable[], opts: { preview?: boolean; stamp?: boolean } = {}) {
     const a = loadAssets();
     // In the dashboard preview the page is scaled to the iframe width.
     const previewCss = opts.preview
@@ -122,7 +130,7 @@ export function renderCertificatesHtml(certs: Renderable[], opts: { preview?: bo
     const previewJs = opts.preview
         ? `<script>function f(){document.documentElement.style.setProperty('--s',Math.min(1,innerWidth/1123))}addEventListener('resize',f);f()</script>`
         : "";
-    const revoked = opts.preview && certs[0]?.status === "REVOKED"
+    const revoked = (opts.preview || opts.stamp) && certs[0]?.status === "REVOKED"
         ? `<div style="position:fixed;inset:0;display:grid;place-items:center;pointer-events:none"><span style="font:700 64px Zad;color:rgba(220,38,38,.55);border:6px solid rgba(220,38,38,.55);padding:8px 28px;border-radius:16px;transform:rotate(-12deg)">ملغاة</span></div>`
         : "";
     return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>${esc(certs.map((c) => c.code).join(", "))}</title><style>${a.css}${previewCss}</style></head><body>${certs.map((c) => section(c, a)).join("")}${revoked}${previewJs}</body></html>`;

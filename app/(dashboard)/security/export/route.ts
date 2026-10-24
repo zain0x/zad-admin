@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { getAuth } from "@/lib/auth/session";
+import { can } from "@/lib/auth/permissions";
 import { STATUS_LABELS, TYPE_LABELS, buildRequestWhere } from "@/lib/requests";
 import { formatDateTime } from "@/lib/utils";
 
@@ -16,13 +17,13 @@ function cell(v: unknown) {
 
 export async function GET(req: NextRequest) {
     const auth = await getAuth();
-    if (!auth || !auth.session.twoFactorPassed || auth.user.mustChangePassword) {
+    if (!auth || !auth.session.twoFactorPassed || auth.user.mustChangePassword || !can(auth.user, "sites")) {
         return NextResponse.redirect(new URL("/login", req.url));
     }
     const sp = req.nextUrl.searchParams;
     const filters = { status: sp.get("status") ?? undefined, type: sp.get("type") ?? undefined, q: sp.get("q") ?? undefined, mine: sp.get("mine") ?? undefined };
     const rows = await db.scanRequest.findMany({
-        where: buildRequestWhere(filters, auth.user.id),
+        where: buildRequestWhere(filters, auth.user),
         orderBy: { createdAt: "desc" },
         take: 10_000,
         include: { assignee: { select: { name: true } } },

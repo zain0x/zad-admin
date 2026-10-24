@@ -2,6 +2,7 @@
 // Phase 1: staff accounts, sessions, 2FA backup codes, audit log.
 // Phase 2: Zad Security requests from zad.gg/security, with notes.
 // Phase 3: certificates (internship, attendance, course), verified at zad.gg/cert/<code>.
+// Email monitoring: subscribed emails re-checked for breaches weekly or monthly, plus anonymous site-check stats.
 
 generator client {
     provider = "prisma-client-js"
@@ -25,6 +26,10 @@ model User {
     role               Role      @default(STAFF)
     isActive           Boolean   @default(true) @map("is_active")
     mustChangePassword Boolean   @default(true) @map("must_change_password")
+    /// Sections a STAFF member may open (admins can open everything)
+    permCertificates   Boolean   @default(false) @map("perm_certificates")
+    permSites          Boolean   @default(false) @map("perm_sites")
+    permEmails         Boolean   @default(false) @map("perm_emails")
     /// Encrypted with AUTH_SECRET (lib/auth/secret-box.ts)
     totpSecret         String?   @map("totp_secret") @db.VarChar(255)
     /// Secret shown during setup, before the first code confirms it
@@ -45,6 +50,10 @@ model User {
     requestNotes     RequestNote[]
     certsIssued      Certificate[] @relation("certIssuer")
     certsRevoked     Certificate[] @relation("certRevoker")
+    emailsAdded      MonitoredEmail[] @relation("emailAddedBy")
+    requestsClosed   ScanRequest[]  @relation("requestCloser")
+    findings         Finding[]      @relation("findingAuthor")
+    requestFiles     RequestFile[]  @relation("fileUploader")
 
     @@map("users")
 }
@@ -134,12 +143,22 @@ model ScanRequest {
     ip              String?       @db.VarChar(64)
     userAgent       String?       @map("user_agent") @db.VarChar(255)
     assigneeId      String?       @map("assignee_id")
+    /// Deadline for the assigned staff member
+    dueAt           DateTime?     @map("due_at")
+    /// Final summary written when the file is closed
+    summary         String?       @db.Text
+    /// A closed file is read-only until an admin reopens it
+    closedAt        DateTime?     @map("closed_at")
+    closedById      String?       @map("closed_by_id")
     statusChangedAt DateTime      @default(now()) @map("status_changed_at")
     createdAt       DateTime      @default(now()) @map("created_at")
     updatedAt       DateTime      @updatedAt @map("updated_at")
 
     assignee User?         @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+    closedBy User?         @relation("requestCloser", fields: [closedById], references: [id], onDelete: SetNull)
     notes    RequestNote[]
+    findings Finding[]
+    files    RequestFile[]
 
     @@index([status])
     @@index([type])
@@ -147,6 +166,60 @@ model ScanRequest {
     @@index([email])
     @@index([assigneeId])
     @@map("scan_requests")
+}
+
+enum Severity {
+    CRITICAL
+    HIGH
+    MEDIUM
+    LOW
+    INFO
+}
+
+enum FindingStatus {
+    OPEN
+    FIXED
+}
+
+/// A vulnerability or observation found while working on a scan request.
+model Finding {
+    id             String        @id @default(cuid())
+    requestId      Int           @map("request_id")
+    title          String        @db.VarChar(200)
+    severity       Severity
+    status         FindingStatus @default(OPEN)
+    affected       String?       @db.VarChar(500)
+    description    String        @db.Text
+    steps          String?       @db.Text
+    recommendation String?       @db.Text
+    authorId       String?       @map("author_id")
+    createdAt      DateTime      @default(now()) @map("created_at")
+    updatedAt      DateTime      @updatedAt @map("updated_at")
+
+    request ScanRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+    author  User?       @relation("findingAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+    @@index([requestId])
+    @@map("findings")
+}
+
+/// A file attached to a scan request (report, screenshot, evidence). Stored on disk outside public/.
+model RequestFile {
+    id           String   @id @default(cuid())
+    requestId    Int      @map("request_id")
+    name         String   @db.VarChar(255)
+    mime         String   @db.VarChar(100)
+    size         Int
+    /// File name inside UPLOADS_DIR (random, never the original name)
+    storageKey   String   @unique @map("storage_key") @db.VarChar(100)
+    uploadedById String?  @map("uploaded_by_id")
+    createdAt    DateTime @default(now()) @map("created_at")
+
+    request    ScanRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+    uploadedBy User?       @relation("fileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+    @@index([requestId])
+    @@map("request_files")
 }
 
 model RequestNote {
@@ -213,4 +286,84 @@ model Certificate {
     @@index([createdAt])
     @@index([email])
     @@map("certificates")
+}
+
+// ─── Email monitoring ──────────────────────────────────────────────────
+
+enum MonitorStatus {
+    ACTIVE
+    PAUSED
+}
+
+enum MonitorFrequency {
+    WEEKLY
+    MONTHLY
+}
+
+model MonitoredEmail {
+    id              String           @id @default(cuid())
+    email           String           @unique @db.VarChar(191)
+    status          MonitorStatus    @default(ACTIVE)
+    frequency       MonitorFrequency @default(WEEKLY)
+    /// "zad.gg/security" for sign-ups from the site, "manual" when staff add it
+    source          String?          @db.VarChar(64)
+    note            String?          @db.VarChar(500)
+    /// Breach names already seen, so only new ones raise an alert
+    knownBreaches   Json?            @map("known_breaches")
+    breachCount     Int              @default(0) @map("breach_count")
+    /// A breach appeared that staff have not reviewed yet
+    hasNewBreach    Boolean          @default(false) @map("has_new_breach")
+    lastNewBreachAt DateTime?        @map("last_new_breach_at")
+    lastCheckedAt   DateTime?        @map("last_checked_at")
+    nextCheckAt     DateTime         @default(now()) @map("next_check_at")
+    lastError       String?          @map("last_error") @db.VarChar(255)
+    addedById       String?          @map("added_by_id")
+    createdAt       DateTime         @default(now()) @map("created_at")
+    updatedAt       DateTime         @updatedAt @map("updated_at")
+
+    addedBy User?        @relation("emailAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+    checks  EmailCheck[]
+
+    @@index([status, nextCheckAt])
+    @@index([hasNewBreach])
+    @@map("monitored_emails")
+}
+
+model EmailCheck {
+    id          String   @id @default(cuid())
+    emailId     String   @map("email_id")
+    checkedAt   DateTime @default(now()) @map("checked_at")
+    breachCount Int      @default(0) @map("breach_count")
+    /// Breaches seen for the first time in this check: [{ name, date }]
+    newBreaches Json?    @map("new_breaches")
+    /// Exposed data kinds (Arabic labels), e.g. ["كلمة المرور", "رقم الهاتف"]
+    exposed     Json?
+    error       String?  @db.VarChar(255)
+
+    email MonitoredEmail @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+    @@index([emailId, checkedAt])
+    @@map("email_checks")
+}
+
+/// One row per breach check on zad.gg/security: the email (encrypted), an HMAC of it to count
+/// repeat checks, and the public breach names that were found.
+model BreachCheckStat {
+    id          String   @id @default(cuid())
+    emailHash   String   @map("email_hash") @db.Char(64)
+    /// Full address, encrypted with AUTH_SECRET (lib/auth/secret-box.ts). Shown only in the dashboard.
+    emailSealed String?  @map("email_sealed") @db.VarChar(600)
+    /// Partly hidden address, e.g. "ze•••@icloud.com" (kept for rows from before full emails were logged)
+    emailMasked String?  @map("email_masked") @db.VarChar(200)
+    emailDomain String?  @map("email_domain") @db.VarChar(191)
+    /// Not a free mail provider (gmail, icloud…): likely a company, a sales lead
+    isCompany   Boolean  @default(false) @map("is_company")
+    breachCount Int      @map("breach_count")
+    breaches    Json?
+    createdAt   DateTime @default(now()) @map("created_at")
+
+    @@index([createdAt])
+    @@index([emailHash])
+    @@index([emailDomain])
+    @@map("breach_check_stats")
 }

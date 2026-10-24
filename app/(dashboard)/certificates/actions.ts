@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import type { CertificateType, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { requireUser } from "@/lib/auth/session";
+import { requireSection } from "@/lib/auth/permissions";
 import { newBatchId, newCertificateCode } from "@/lib/certificates/code";
 import { readPeople } from "@/lib/certificates/csv";
 import { isCertType, parseDetails, parsePerson, type CertDetails } from "@/lib/certificates/types";
@@ -37,7 +37,7 @@ function readForm(form: FormData) {
 }
 
 export async function issueCertificateAction(_prev: CertFormState, form: FormData): Promise<CertFormState> {
-    const { user } = await requireUser();
+    const { user } = await requireSection("certificates");
     const r = readForm(form);
     if ("error" in r) return { error: r.error };
 
@@ -60,7 +60,7 @@ export async function issueCertificateAction(_prev: CertFormState, form: FormDat
 }
 
 export async function updateCertificateAction(_prev: CertFormState, form: FormData): Promise<CertFormState> {
-    const { user } = await requireUser();
+    const { user } = await requireSection("certificates");
     const id = String(form.get("id") ?? "");
     const current = await db.certificate.findUnique({ where: { id } });
     if (!current) return { error: "الشهادة غير موجودة." };
@@ -92,7 +92,7 @@ export async function updateCertificateAction(_prev: CertFormState, form: FormDa
 }
 
 export async function revokeCertificateAction(form: FormData) {
-    const { user } = await requireUser();
+    const { user } = await requireSection("certificates");
     const id = String(form.get("id") ?? "");
     const reason = String(form.get("reason") ?? "").trim().slice(0, 500);
     const cert = await db.certificate.findUnique({ where: { id } });
@@ -107,7 +107,7 @@ export async function revokeCertificateAction(form: FormData) {
 }
 
 export async function restoreCertificateAction(form: FormData) {
-    const { user } = await requireUser();
+    const { user } = await requireSection("certificates");
     const id = String(form.get("id") ?? "");
     const cert = await db.certificate.findUnique({ where: { id } });
     if (!cert || cert.status === "ACTIVE") return;
@@ -131,7 +131,7 @@ const SHARED_FIELDS = ["type", "issuedAt", "titleAr", "titleEn", "date", "hours"
 
 /** Step 1: read the file and show what will be issued. Nothing is saved yet. */
 export async function previewBulkAction(_prev: BulkState, form: FormData): Promise<BulkState> {
-    await requireUser();
+    await requireSection("certificates");
     const type = form.get("type");
     if (!isCertType(type)) return { error: "اختر نوع الشهادة." };
     const d = parseDetails(type, form);
@@ -155,7 +155,7 @@ export async function previewBulkAction(_prev: BulkState, form: FormData): Promi
 
 /** Step 2: issue one certificate per valid row. Everything is validated again here. */
 export async function issueBulkAction(_prev: BulkState, form: FormData): Promise<BulkState> {
-    const { user } = await requireUser();
+    const { user } = await requireSection("certificates");
     const type = form.get("type");
     if (!isCertType(type)) return { error: "اختر نوع الشهادة." };
     const d = parseDetails(type, form);

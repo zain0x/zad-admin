@@ -1,4 +1,4 @@
-import type { Prisma, RequestStatus, ScanType } from "@prisma/client";
+import type { Prisma, RequestStatus, ScanType, Severity, User } from "@prisma/client";
 
 export const STATUS_LABELS: Record<RequestStatus, string> = {
     NEW: "جديد",
@@ -39,11 +39,35 @@ export function isType(v: unknown): v is ScanType {
 
 export type RequestFilters = { status?: string; type?: string; q?: string; mine?: string };
 
-export function buildRequestWhere(f: RequestFilters, userId: string): Prisma.ScanRequestWhereInput {
-    const where: Prisma.ScanRequestWhereInput = {};
+/** Site/leak scan requests. Old breach-alert sign-ups (NOTIFY) now live in email monitoring. */
+export const SCAN_TYPES: ScanType[] = ["SITE", "LEAK"];
+
+/** Admins see every request; staff only the ones assigned to them. */
+export function canSeeRequest(user: Pick<User, "id" | "role">, r: { assigneeId: string | null }) {
+    return user.role === "ADMIN" || r.assigneeId === user.id;
+}
+
+export const SEVERITY_ORDER: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+
+export const SEVERITY: Record<Severity, { ar: string; en: string; color: string; tone: "danger" | "warning" | "primary" | "neutral" | "success" }> = {
+    CRITICAL: { ar: "حرجة", en: "Critical", color: "#b91c1c", tone: "danger" },
+    HIGH: { ar: "عالية", en: "High", color: "#ea580c", tone: "danger" },
+    MEDIUM: { ar: "متوسطة", en: "Medium", color: "#d97706", tone: "warning" },
+    LOW: { ar: "منخفضة", en: "Low", color: "#2563eb", tone: "primary" },
+    INFO: { ar: "معلومات", en: "Info", color: "#6b7280", tone: "neutral" },
+};
+
+export function isSeverity(v: unknown): v is Severity {
+    return typeof v === "string" && (SEVERITY_ORDER as string[]).includes(v);
+}
+
+export function buildRequestWhere(f: RequestFilters, user: Pick<User, "id" | "role">): Prisma.ScanRequestWhereInput {
+    const userId = user.id;
+    const where: Prisma.ScanRequestWhereInput = { type: { in: SCAN_TYPES } };
+    if (user.role !== "ADMIN") where.assigneeId = user.id;
     if (isStatus(f.status)) where.status = f.status;
     else if (f.status === "open") where.status = { in: OPEN_STATUSES };
-    if (isType(f.type)) where.type = f.type;
+    if (f.type === "SITE" || f.type === "LEAK") where.type = f.type;
     if (f.mine === "1") where.assigneeId = userId;
     const q = f.q?.trim().slice(0, 100);
     if (q) {

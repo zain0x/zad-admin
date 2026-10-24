@@ -3,6 +3,8 @@ import type { ScanType } from "@prisma/client";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { verifySignature } from "@/lib/ingest-signature";
+import { isCompanyDomain } from "@/lib/breach/domains";
+import { seal } from "@/lib/auth/secret-box";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +22,8 @@ function fail(status: number, error: string) {
 }
 
 /**
- * Receives Zad Security requests from zad-landing (/api/security).
+ * Receives from zad-landing: scan requests (/api/security), breach-alert sign-ups
+ * (→ email monitoring) and anonymous breach-check stats (/api/security/breach).
  * Each call is signed: X-Zad-Timestamp + X-Zad-Signature = HMAC-SHA256(INGEST_SECRET, "<ts>.<body>").
  */
 export async function POST(req: NextRequest) {
@@ -52,9 +55,47 @@ export async function POST(req: NextRequest) {
         return fail(400, "invalid json");
     }
 
+    // Anonymous stats of a breach check made on the site (no email, only its HMAC).
+    if (body.kind === "breach_check") {
+        const emailHash = typeof body.emailHash === "string" && /^[0-9a-f]{64}$/.test(body.emailHash) ? body.emailHash : null;
+        const breachCount = Number.isInteger(body.breachCount) ? Math.min(Math.max(Number(body.breachCount), 0), 10000) : null;
+        if (!emailHash || breachCount === null) return fail(400, "invalid stats");
+        const names = Array.isArray(body.breaches)
+            ? body.breaches.filter((n): n is string => typeof n === "string").map((n) => n.slice(0, 120)).slice(0, 200)
+            : [];
+        // The full email is stored encrypted; the masked copy and domain stay readable for stats.
+        const fullEmail = typeof body.email === "string" && body.email.length <= 191 && EMAIL_PATTERN.test(body.email) ? body.email.toLowerCase() : null;
+        const emailMasked = typeof body.emailMasked === "string" && /^[^@\s]{1,3}•••@[^@\s]{1,191}$/.test(body.emailMasked) ? body.emailMasked : null;
+        const emailDomain = (fullEmail ?? emailMasked)?.split("@")[1]?.toLowerCase().slice(0, 191) ?? null;
+        await db.breachCheckStat.create({
+            data: {
+                emailHash,
+                emailSealed: fullEmail ? seal(fullEmail) : null,
+                emailMasked,
+                emailDomain,
+                isCompany: emailDomain ? isCompanyDomain(emailDomain) : false,
+                breachCount,
+                breaches: names,
+            },
+        });
+        return NextResponse.json({ ok: true }, { status: 201 });
+    }
+
     const externalId = str(body.id, 64);
     const email = str(body.email, 191)?.toLowerCase() ?? null;
     if (!externalId || !email || !EMAIL_PATTERN.test(email)) return fail(400, "missing id or email");
+
+    // Breach-alert sign-up: goes straight into email monitoring (first check runs on the next cron).
+    if (body.kind === "notify") {
+        const existing = await db.monitoredEmail.findUnique({ where: { email } });
+        if (existing) {
+            if (existing.status === "PAUSED") await db.monitoredEmail.update({ where: { id: existing.id }, data: { status: "ACTIVE", nextCheckAt: new Date() } });
+            return NextResponse.json({ id: existing.id, duplicate: true });
+        }
+        const m = await db.monitoredEmail.create({ data: { email, source: str(body.source, 64) ?? "zad.gg/security" } });
+        await audit({ actorId: null, action: "email.added", targetType: "monitored_email", targetId: m.id, details: { via: "site" } });
+        return NextResponse.json({ id: m.id }, { status: 201 });
+    }
 
     let type: ScanType;
     let name: string | null = null;
@@ -62,9 +103,7 @@ export async function POST(req: NextRequest) {
     let target: string | null = null;
     let authorized = false;
 
-    if (body.kind === "notify") {
-        type = "NOTIFY";
-    } else if (body.kind === "scan") {
+    if (body.kind === "scan") {
         type = body.scanType === "leak" ? "LEAK" : "SITE";
         name = str(body.name, 120);
         phone = str(body.phone, 40);

@@ -82,6 +82,15 @@ deny all;
 - **Backups ← Remote Backups** في CloudPanel: للملفات والقاعدة إلى مكان خارج السيرفر (S3، Dropbox...).
 - Snapshot من لوحة Contabo قبل أي تحديث كبير.
 
+## 10) الفحص الدوري للإيميلات (Cron)
+في `.env` على السيرفر أضف `HIBP_API_KEY` (نفس مفتاح zad-landing) و`CRON_SECRET` (من `openssl rand -hex 32`).
+
+ثم **Cron Jobs ← Add Cron Job** في CloudPanel، كل ساعة (`0 * * * *`):
+```bash
+curl -s -X POST -H "Authorization: Bearer <CRON_SECRET>" http://127.0.0.1:3001/api/cron/email-monitor
+```
+كل تشغيل يفحص حتى 25 إيميلاً حان موعدها (أسبوعي أو شهري حسب كل إيميل)، وما لم يُفحص يُكمل في الساعة التالية.
+
 ## فحص سريع بعد النشر
 ```bash
 curl -s https://<domain>/api/health    # {"ok":true}
