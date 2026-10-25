@@ -227,7 +227,7 @@ export default async function InternshipPage({ params, searchParams }: Props) {
                             ) : a.status === "COMPLETED" ? (
                                 <IssueCertForm id={a.id} />
                             ) : (
-                                <p className="text-sm text-muted-foreground">بتقدر تصدر الشهادة لما تصير الحالة «أنهى التدريب» وتكمل الاسم بالإنجليزي والقسم والتواريخ والساعات.</p>
+                                <p className="text-sm text-muted-foreground">بتقدر تصدر الشهادة لما تصير الحالة «أنهى التدريب» وتكمل الاسم بالإنجليزي والقسم والتواريخ.</p>
                             )}
                         </div>
                     </Card>

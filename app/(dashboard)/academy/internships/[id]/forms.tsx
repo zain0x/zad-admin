@@ -59,10 +59,6 @@ export function DetailsForm({
                     <Input id="endDate" name="endDate" type="date" dir="ltr" defaultValue={initial.endDate} />
                 </div>
             </div>
-            <div>
-                <Label htmlFor="hours">عدد الساعات</Label>
-                <Input id="hours" name="hours" type="number" min={1} max={5000} dir="ltr" defaultValue={initial.hours} />
-            </div>
             <SubmitButton size="sm" pendingText="جارٍ الحفظ…">
                 حفظ
             </SubmitButton>

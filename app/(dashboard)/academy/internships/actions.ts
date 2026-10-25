@@ -90,7 +90,7 @@ export async function addNoteAction(_prev: InternFormState, form: FormData): Pro
     return { ok: "تمت الإضافة." };
 }
 
-/** Turns a finished internship into an INTERNSHIP certificate, reusing the stored dates/department/hours. */
+/** Turns a finished internship into an INTERNSHIP certificate, reusing the stored dates and department. */
 export async function issueInternCertificateAction(_prev: InternFormState, form: FormData): Promise<InternFormState> {
     const { user } = await requireSection("internships");
     const id = appId(form);
@@ -99,14 +99,14 @@ export async function issueInternCertificateAction(_prev: InternFormState, form:
     if (a.certificateId) return { error: "تم إصدار شهادة لهذا الطلب مسبقاً." };
     if (a.status !== "COMPLETED") return { error: "غيّر الحالة لـ «أنهى التدريب» أولاً." };
     if (!a.nameEn || !/^[A-Za-z][A-Za-z .'\-]*$/.test(a.nameEn)) return { error: "أضف الاسم بالإنجليزي من «بيانات التدريب» (يُطبع على الشهادة)." };
-    if (!a.department || !a.startDate || !a.endDate || !a.hours) return { error: "أكمل القسم وتاريخ البداية والنهاية والساعات قبل الإصدار." };
+    if (!a.department || !a.startDate || !a.endDate) return { error: "أكمل القسم وتاريخ البداية والنهاية قبل الإصدار." };
 
     const skills = str(form, "skills", 600)
         .split(/[,،\n]/)
         .map((s) => s.trim())
         .filter(Boolean)
         .slice(0, 6);
-    const details: CertDetails = { departmentAr: a.department, startDate: isoDay(a.startDate), endDate: isoDay(a.endDate), hours: a.hours, skills };
+    const details: CertDetails = { departmentAr: a.department, startDate: isoDay(a.startDate), endDate: isoDay(a.endDate), skills };
     const issuedAt = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
 
     const cert = await db.$transaction(async (tx) => {

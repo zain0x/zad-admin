@@ -63,20 +63,20 @@ export function parseDetails(type: CertificateType, form: FormData): { details: 
         if (!departmentAr) return { error: "أدخل القسم." };
         if (!DATE.test(startDate) || !DATE.test(endDate)) return { error: "أدخل تاريخ بداية ونهاية التدريب." };
         if (startDate > endDate) return { error: "تاريخ البداية بعد تاريخ النهاية." };
-        if (!hours) return { error: "أدخل عدد الساعات." };
         const skills = str(form, "skills", 600)
             .split(/[,،\n]/)
             .map((s) => s.trim())
             .filter(Boolean)
             .slice(0, 6);
-        return { details: { departmentAr, departmentEn: str(form, "departmentEn", 120) || undefined, startDate, endDate, hours, skills } };
+        return { details: { departmentAr, departmentEn: str(form, "departmentEn", 120) || undefined, startDate, endDate, skills } };
     }
 
     const titleAr = str(form, "titleAr", 160);
     const date = str(form, "date", 10);
     if (!titleAr) return { error: type === "COURSE" ? "أدخل اسم الكورس." : "أدخل عنوان المحاضرة." };
     if (!DATE.test(date)) return { error: type === "COURSE" ? "أدخل تاريخ الإتمام." : "أدخل تاريخ المحاضرة." };
-    if (!hours) return { error: type === "COURSE" ? "أدخل عدد الساعات." : "أدخل مدة المحاضرة بالساعات." };
+    if (type === "COURSE") return { details: { titleAr, titleEn: str(form, "titleEn", 160) || undefined, date } };
+    if (!hours) return { error: "أدخل مدة المحاضرة بالساعات." };
     return { details: { titleAr, titleEn: str(form, "titleEn", 160) || undefined, date, hours } };
 }
 
@@ -102,7 +102,6 @@ export function describe(type: CertificateType, gender: Gender, d: CertDetails) 
             bodyEn: `has successfully completed a practical internship${d.departmentEn ? ` in the ${d.departmentEn} department` : ""} at Zad.`,
             facts: [
                 { ar: "الفترة", en: "Period", value: d.startDate && d.endDate ? arPeriod(d.startDate, d.endDate) : "" },
-                { ar: "الساعات", en: "Hours", value: d.hours ? arHours(d.hours) : "" },
                 { ar: "القسم", en: "Department", value: d.departmentAr ?? "" },
             ],
             skills: d.skills ?? [],
@@ -125,7 +124,6 @@ export function describe(type: CertificateType, gender: Gender, d: CertDetails) 
         bodyEn: d.titleEn ? `has successfully completed the course “${d.titleEn}”.` : "has successfully completed a course at Zad.",
         facts: [
             { ar: "الكورس", en: "Course", value: d.titleAr ?? "" },
-            { ar: "الساعات", en: "Hours", value: d.hours ? arHours(d.hours) : "" },
             { ar: "تاريخ الإتمام", en: "Completed", value: d.date ? arDate(d.date) : "" },
         ],
         skills: [],

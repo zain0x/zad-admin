@@ -61,7 +61,7 @@ function qrSvg(url: string) {
 }
 
 /** Bump whenever the certificate design changes, so cached images and PDFs are drawn again. */
-export const TEMPLATE_VERSION = "2026-10-24";
+export const TEMPLATE_VERSION = "2026-10-25";
 
 export function verifyUrl(code: string) {
     const base = (process.env.CERT_VERIFY_BASE_URL || "https://zad.gg/cert").replace(/\/+$/, "");

@@ -70,9 +70,6 @@ export function TypeFields({ type, d = {} }: { type: CertificateType; d?: CertDe
                 <Field label="نهاية التدريب">
                     <Input name="endDate" type="date" defaultValue={d.endDate} required dir="ltr" />
                 </Field>
-                <Field label="عدد الساعات">
-                    <Input name="hours" type="number" min={1} max={5000} defaultValue={d.hours} required dir="ltr" />
-                </Field>
                 <Field label="المهارات" hint="اختياري، افصل بينها بفاصلة، حتى 6">
                     <Input name="skills" defaultValue={d.skills?.join("، ")} maxLength={600} placeholder="اختبار الاختراق، تحليل الثغرات" />
                 </Field>
@@ -91,9 +88,11 @@ export function TypeFields({ type, d = {} }: { type: CertificateType; d?: CertDe
             <Field label={course ? "تاريخ الإتمام" : "تاريخ المحاضرة"}>
                 <Input name="date" type="date" defaultValue={d.date} required dir="ltr" />
             </Field>
-            <Field label={course ? "عدد الساعات" : "المدة بالساعات"}>
-                <Input name="hours" type="number" min={1} max={5000} defaultValue={d.hours} required dir="ltr" />
-            </Field>
+            {!course && (
+                <Field label="المدة بالساعات">
+                    <Input name="hours" type="number" min={1} max={5000} defaultValue={d.hours} required dir="ltr" />
+                </Field>
+            )}
         </div>
     );
 }
